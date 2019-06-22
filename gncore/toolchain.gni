@@ -1,0 +1,330 @@
+# Copyright (c) 2019 Alfredo Mazzinghi
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+# Private c_toolchain environment args.
+# These are set by the current c_toolchain::toolchain_args.
+declare_args() {
+  # Current toolchain sysroot.
+  _gncore_c_toolchain_sysroot = "__INVALID__"
+
+  # Current toolchain objdump.
+  _gncore_c_toolchain_objdump = "__INVALID__"
+
+  # Current toolchain objcopy.
+  _gncore_c_toolchain_objcopy = "__INVALID__"
+
+  # Current toolchain ld.
+  _gncore_c_toolchain_ld = "__INVALID__"
+}
+
+# Relative path of the gncore tree wrt the build top level
+_gncore_base = rebase_path(".", "//")
+
+# Base toolchain definition for C and C++.
+# Note that this assumes that the toolchain accepts gcc-like flags.
+# Note that this currently assumes a UNIX environment for the stamp and copy
+# tools.
+#
+# Arguments:
+# tool_cc: tool to use to compile C files
+# tool_cxx: tool to use to compile C++ files
+# tool_ar: tool to use to archive static libraries
+# tool_link: tool to use to link executables
+# tool_solink: tool to use to link shared libraries
+# tool_objdump: tool to use for objdump targets
+# tool_objcopy: tool to use for objcopy targets
+# tool_ld: tool to use for ld targets
+# [sysroot]: optional toolchain base path
+#
+# This creates the toolchain with the given ${target_name},
+# the objdump, objcopy and ld tools are used to configure the
+# respective templates for the current toolchain.
+#
+template("c_toolchain") {
+  assert(defined(invoker.tool_cc), "c_toolchain::tool_cc must be defined")
+  assert(defined(invoker.tool_cxx), "c_toolchain::tool_cxx must be defined")
+  assert(defined(invoker.tool_ar), "c_toolchain::tool_ar must be defined")
+  assert(defined(invoker.tool_link), "c_toolchain::tool_link must be defined")
+  assert(defined(invoker.tool_solink),
+         "c_toolchain::tool_solink must be defined")
+  assert(defined(invoker.tool_objdump),
+         "c_toolchain::tool_objdump must be defined")
+  assert(defined(invoker.tool_objcopy),
+         "c_toolchain::tool_objcopy must be defined")
+  assert(defined(invoker.tool_ld), "c_toolchain::tool_ld must be defined")
+  assert(defined(invoker.toolchain_args),
+         "c_toolchain::toolchain_args must be defined")
+
+  sysroot = ""
+  prefix = ""
+  if (defined(invoker.sysroot)) {
+    sysroot = invoker.sysroot
+    prefix = "${sysroot}/"
+  }
+
+  tool_cc = "${prefix}${invoker.tool_cc}"
+  tool_cxx = "${prefix}${invoker.tool_cxx}"
+  tool_link = "${prefix}${invoker.tool_link}"
+  tool_solink = "${prefix}${invoker.tool_solink}"
+  tool_ar = "${prefix}${invoker.tool_ar}"
+
+  tool_objdump = "${prefix}${invoker.tool_objdump}"
+  tool_objcopy = "${prefix}${invoker.tool_objcopy}"
+  tool_ld = "${prefix}${invoker.tool_ld}"
+
+  dep_pattern = "{{output}}.d"
+
+  toolchain(target_name) {
+    tool("cc") {
+      description = "CC {{output}}"
+      command = "${tool_cc} -MMD -MF ${dep_pattern} {{include_dirs}} {{defines}} {{cflags}} {{cflags_c}} -c {{source}} -o {{output}}"
+      depfile = dep_pattern
+      depsformat = "gcc"
+      outputs = [
+        "{{source_out_dir}}/{{target_output_name}}.{{source_name_part}}.o",
+      ]
+    }
+
+    tool("cxx") {
+      description = "CXX {{output}}"
+      command = "${tool_cxx} -MMD -MF ${dep_pattern} {{include_dirs}} {{defines}} {{cflags}} {{cflags_cc}} -c {{source}} -o {{output}}"
+      depfile = dep_pattern
+      depsformat = "gcc"
+      outputs = [
+        "{{source_out_dir}}/{{target_output_name}}.{{source_name_part}}.o",
+      ]
+    }
+
+    tool("asm") {
+      description = "ASM {{output}}"
+      command = "${tool_cc} -MMD -MF ${dep_pattern} {{include_dirs}} {{defines}} {{asmflags}} -S {{source}} -o {{output}}"
+      depfile = dep_pattern
+      depsformat = "gcc"
+      outputs = [
+        "{{source_out_dir}}/{{target_output_name}}.{{source_name_part}}.o",
+      ]
+    }
+
+    tool("link") {
+      description = "LINK {{output}}"
+
+      default_output_dir = "{{root_out_dir}}/${target_name}"
+      exename = "{{target_output_name}}{{output_extension}}"
+      outfile = "{{output_dir}}/${exename}"
+      rspfile = "${outfile}.rsp"
+      rspfile_content = "{{inputs}} {{solibs}} {{libs}}"
+      command = "${tool_link} {{ldflags}} -o {{output}} -Wl,--start-group @\"${rspfile}\" -Wl,--end-group"
+      outputs = [
+        outfile,
+      ]
+    }
+
+    tool("solink") {
+      description = "LINK {{output}}"
+
+      default_output_dir = "{{root_out_dir}}/${target_name}"
+      default_output_extension = ".so"
+      output_prefix = "lib"
+      soname = "{{target_output_name}}{{output_extension}}"
+      outfile = "{{output_dir}}/${soname}"
+      rspfile = "${outfile}.rsp"
+      rspfile_content = "{{inputs}}"
+      command = "${tool_solink} {{ldflags}} -o {{output}} -Wl,--start-group @\"${rspfile}\" -Wl,--end-group {{solibs}} {{libs}}"
+
+      outputs = [
+        outfile,
+      ]
+    }
+
+    tool("alink") {
+      description = "AR {{output}}"
+
+      default_output_dir = "{{root_out_dir}}/${target_name}"
+      default_output_extension = ".a"
+      output_prefix = "lib"
+      aname = "{{target_output_name}}{{output_extension}}"
+      outfile = "{{output_dir}}/${aname}"
+      rspfile = "${outfile}.rsp"
+      rspfile_content = "{{inputs}}"
+      command = "${tool_ar} {{arflags}} -r -c -s -D {{output}} @\"${rspfile}\""
+
+      outputs = [
+        outfile,
+      ]
+    }
+
+    tool("stamp") {
+      description = "STAMP {{output}}"
+      command = "touch {{output}}"
+    }
+
+    tool("copy") {
+      description = "COPY {{source}} {{output}}"
+      command = "cp -af {{source}} {{output}}"
+    }
+
+    toolchain_args = {
+      forward_variables_from(invoker.toolchain_args, "*")
+
+      # Set gncore c_toolchain environment
+      _gncore_c_toolchain_sysroot = sysroot
+      _gncore_c_toolchain_objcopy = tool_objcopy
+      _gncore_c_toolchain_objdump = tool_objdump
+      _gncore_c_toolchain_ld = tool_ld
+    }
+  }
+}
+
+# Objdump action for the current toolchain. Note that the toolchain
+# must have been created with :c_toolchain.
+#
+# Arguments:
+# args: string - extra objdump arguments
+# sources: list - objdump input files, this should be a list of labels.
+#    Labels generated by c_toolchain tools will be placed in
+#    {{root_out_dir}}/{{toolchain}}/name, this target will look for this path.
+#    If the sources do not follow this convention, set raw_sources = true.
+# output: string - output file
+# [raw_sources]: bool - the sources list does(false) or does not(true)
+#    contain labels
+# [deps, testonly]
+#
+# This creates an action target template to run the toolchain
+# objdump on a specified file.
+#
+template("objdump") {
+  assert(defined(invoker.args), "objdump::args must be defined")
+  assert(defined(invoker.sources), "objdump::sources must be defined")
+  assert(defined(invoker.output), "objdump::output must be defined")
+
+  raw_sources = false
+  if (defined(invoker.raw_sources)) {
+    raw_sources = invoker.raw_sources
+  }
+
+  action(target_name) {
+    script = "//${_gncore_base}/scripts/invoke.py"
+
+    # Build source paths based on the expected output paths of c_toolchain
+    sources = []
+    foreach(src, invoker.sources) {
+      if (!raw_sources) {
+        root_out = get_label_info(src, "root_out_dir")
+        label_name = get_label_info(src, "name")
+        tchain = get_label_info(src, "toolchain")
+        tchain_name = get_label_info(tchain, "name")
+        src = "${root_out}/${tchain_name}/${label_name}"
+      }
+      src = rebase_path(src)
+      sources += [ src ]
+    }
+
+    # Prepare arguments for invoke
+    option_args = string_replace(invoker.args, "-", "%OPT%")
+
+    args = [
+      _gncore_c_toolchain_objdump,
+      option_args,
+    ]
+    args += sources
+    args += [
+      "--stdout",
+      rebase_path(invoker.output, "${root_out_dir}"),
+    ]
+
+    outputs = [
+      invoker.output,
+    ]
+
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                           ])
+  }
+}
+
+# Helper for the common host toolchain definition based on the
+# default system cc and c++ symlinks
+#
+template("host_c_toolchain") {
+  c_toolchain(target_name) {
+    tool_cc = "cc"
+    tool_cxx = "c++"
+    tool_ar = "ar"
+    tool_link = tool_cxx
+    tool_solink = tool_cxx
+    tool_objdump = "objdump"
+    tool_objcopy = "objcopy"
+    tool_ld = "ld"
+
+    toolchain_args = {
+      if (defined(invoker.toolchain_args)) {
+        forward_variables_from(invoker.toolchain_args, "*")
+      }
+    }
+  }
+}
+
+# Helper for a common gcc toolchain definition
+#
+template("gcc_toolchain") {
+  c_toolchain(target_name) {
+    tool_cc = "gcc"
+    tool_cxx = "g++"
+    tool_ar = "ar"
+    tool_link = tool_cxx
+    tool_solink = tool_cxx
+    tool_objdump = "objdump"
+    tool_objcopy = "objcopy"
+    tool_ld = "ld"
+
+    forward_variables_from(invoker, "sysroot")
+
+    toolchain_args = {
+      if (defined(invoker.toolchain_args)) {
+        forward_variables_from(invoker.toolchain_args, "*")
+      }
+    }
+  }
+}
+
+# Helper for a common clang toolchain definition
+#
+template("clang_toolchain") {
+  c_toolchain(target_name) {
+    tool_cc = "clang"
+    tool_cxx = "clang++"
+    tool_ar = "llvm-ar"
+    tool_link = tool_cxx
+    tool_solink = tool_cxx
+    tool_objdump = "llvm-objdump"
+    tool_objcopy = "llvm-objcopy"
+    tool_ld = "lld"
+
+    forward_variables_from(invoker, "sysroot")
+
+    toolchain_args = {
+      if (defined(invoker.toolchain_args)) {
+        forward_variables_from(invoker.toolchain_args, "*")
+      }
+    }
+  }
+}

@@ -1,0 +1,40 @@
+# Copyright (c) 2019 Alfredo Mazzinghi
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+import("toolchain.gni")
+
+# Dummy toolchain used as the default toolchain.
+# This forces explicit mention of the toolchain used in the project.
+# The main reason for this to exist is that the asymmetry in the way
+# the default toolchain is used makes it hard to configure the external
+# objdump/objcopy/ld templates with the correct toolchain_args as these
+# are not known in advance and are not substituted for the default toolchain.
+c_toolchain("fake_toolchain") {
+  tool_cc = "__fake_toolchain__"
+  tool_cxx = "__fake_toolchain__"
+  tool_ar = "__fake_toolchain__"
+  tool_link = "__fake_toolchain__"
+  tool_solink = "__fake_toolchain__"
+  tool_objdump = "__fake_toolchain__"
+  tool_objcopy = "__fake_toolchain__"
+  tool_ld = "__fake_toolchain__"
+  toolchain_args = {
+  }
+}

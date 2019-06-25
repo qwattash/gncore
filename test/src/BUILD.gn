@@ -39,10 +39,8 @@ executable("test_executable") {
 }
 
 objdump("test_exe_dump") {
-  sources = [
-    ":test_executable",
-  ]
-  output = "${root_out_dir}/test_executable.dump"
+  source_labels = [ ":test_executable" ]
+  output = "test_executable.dump"
   args = "-t"
 
   deps = [

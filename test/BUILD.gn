@@ -24,5 +24,6 @@
 group("root") {
   deps = [
     "src:test_exe_dump(tc:host_tc_default)",
+    #"src:test_executable(tc:host_tc_default)",
   ]
 }

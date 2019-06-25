@@ -34,7 +34,6 @@ c_toolchain("fake_toolchain") {
   tool_solink = "__fake_toolchain__"
   tool_objdump = "__fake_toolchain__"
   tool_objcopy = "__fake_toolchain__"
-  tool_ld = "__fake_toolchain__"
   toolchain_args = {
   }
 }

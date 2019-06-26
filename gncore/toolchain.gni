@@ -131,7 +131,6 @@ template("c_toolchain") {
     tool("link") {
       description = "LINK {{output}}"
 
-      # default_output_dir = "{{root_out_dir}}/${target_name}"
       default_output_dir = "{{root_out_dir}}"
       exename = "{{target_output_name}}{{output_extension}}"
       outfile = "{{output_dir}}/${exename}"
@@ -146,7 +145,6 @@ template("c_toolchain") {
     tool("solink") {
       description = "LINK {{output}}"
 
-      # default_output_dir = "{{root_out_dir}}/${target_name}"
       default_output_dir = "{{root_out_dir}}"
       default_output_extension = ".so"
       output_prefix = "lib"
@@ -164,7 +162,6 @@ template("c_toolchain") {
     tool("alink") {
       description = "AR {{output}}"
 
-      # default_output_dir = "{{root_out_dir}}/${target_name}"
       default_output_dir = "{{root_out_dir}}"
       default_output_extension = ".a"
       output_prefix = "lib"
@@ -196,7 +193,7 @@ template("c_toolchain") {
       _gncore_c_toolchain_sysroot = sysroot
       _gncore_c_toolchain_objcopy = tool_objcopy
       _gncore_c_toolchain_objdump = tool_objdump
-      _gncore_c_toolchain_default_output_dir = "${root_out_dir}/${target_name}"
+      _gncore_c_toolchain_default_output_dir = "${target_name}/${target_name}"
     }
   }
 }
@@ -221,6 +218,9 @@ template("c_toolchain") {
 #     none -> no handling, invoker is supposed to place it in the args string.
 #     stdout -> tool stdout redirected to the output file.
 #     append -> output file appended as the last item of the argument string.
+# [input_dir]: string
+#     override the default directory for input files. These are looked up in
+#     {{root_out_dir}} by default.
 # [output_dir]: string
 #     override the default toolchain output directory for output file(s).
 # [deps, testonly]
@@ -238,11 +238,11 @@ template("c_toolchain_tool") {
     script = "//${_gncore_base}/scripts/invoke.py"
 
     # Generate output arguments
-    # output_dir = _gncore_c_toolchain_default_output_dir
-    # if (defined(invoker.output_dir)) {
-    #   output_dir = invoker.output_dir
-    # }
-    output_path = "${root_out_dir}/${invoker.output}"
+    output_dir = "${root_out_dir}"
+    if (defined(invoker.output_dir)) {
+      output_dir = invoker.output_dir
+    }
+    output_path = "${output_dir}/${invoker.output}"
     output_args = []
     if (invoker.output_mode == "stdout") {
       output_args = [
@@ -257,6 +257,11 @@ template("c_toolchain_tool") {
     sources = []
     source_paths = []
 
+    input_dir = "${root_out_dir}"
+    if (defined(invoker.input_dir)) {
+      input_dir = invoker.input_dir
+    }
+
     if (defined(invoker.sources)) {
       sources += invoker.sources
       source_paths = rebase_path(invoker.sources)
@@ -264,7 +269,7 @@ template("c_toolchain_tool") {
     if (defined(invoker.source_labels)) {
       foreach(src, invoker.source_labels) {
         label_name = get_label_info(src, "name")
-        label_path = "${root_out_dir}/${label_name}"
+        label_path = "${input_dir}/${label_name}"
         sources += [ label_path ]
         source_paths += [ rebase_path(label_path) ]
       }
@@ -297,7 +302,7 @@ template("c_toolchain_tool") {
 # objdump and redirect the output to a given file.
 #
 # Arguments:
-# c_toolchain_tool::{args, source_labels, sources, output, output_dir, deps, testonly}
+# c_toolchain_tool::{args, source_labels, sources, input_dir, output, output_dir, deps, testonly}
 template("objdump") {
   c_toolchain_tool(target_name) {
     tool_path = _gncore_c_toolchain_objdump
@@ -307,6 +312,7 @@ template("objdump") {
                              "args",
                              "source_labels",
                              "sources",
+                             "input_dir",
                              "output",
                              "output_dir",
                              "deps",
@@ -321,7 +327,7 @@ template("objdump") {
 # objcopy on a specified file.
 #
 # Arguments:
-# c_toolchain_tool::{args, source_labels, sources, output, output_dir, deps, testonly}
+# c_toolchain_tool::{args, source_labels, sources, input_dir, output, output_dir, deps, testonly}
 template("objcopy") {
   c_toolchain_tool(target_name) {
     tool_path = _gncore_c_toolchain_objcopy
@@ -331,6 +337,7 @@ template("objcopy") {
                              "args",
                              "source_labels",
                              "sources",
+                             "input_dir",
                              "output",
                              "output_dir",
                              "deps",

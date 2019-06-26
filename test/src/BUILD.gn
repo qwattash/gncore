@@ -33,6 +33,7 @@ config("conf_default") {
 }
 
 executable("test_executable") {
+  output_dir = "${root_out_dir}/foobar"
   sources = [
     "standalone.cc",
   ]
@@ -40,6 +41,8 @@ executable("test_executable") {
 
 objdump("test_exe_dump") {
   source_labels = [ ":test_executable" ]
+  output_dir = "${root_out_dir}/foobar"
+  input_dir = "${root_out_dir}/foobar"
   output = "test_executable.dump"
   args = "-t"
 
